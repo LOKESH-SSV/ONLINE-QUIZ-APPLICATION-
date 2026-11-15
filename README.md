@@ -1,70 +1,89 @@
-# Online Quiz Application – Java AWT + SQLite (VS Code)
+# Online Quiz Application — Java AWT + SQLite
 
-A desktop-based multiple-choice quiz application built with **Java AWT**, **JDBC** and **SQLite**. It uses no Swing components and does not require a MySQL server.
+A desktop-based quiz and examination management system built with Java 17, AWT, JDBC and SQLite.
 
 ## Features
-- Registration lets the user choose **Student** or **Teacher**.
-- Login redirects both account types to the dashboard with the correct permissions.
-- Teacher dashboard includes question management: add MCQs by category and choose the correct option.
-- Student dashboard supports subject/category-based quizzes.
-- Four options per question, next-question navigation and answer retention.
-- Ten-minute countdown with automatic submission.
-- Automatic scoring, result storage and top-10 leaderboard.
-- Password hashing using PBKDF2-HMAC-SHA256.
-- SQLite database and sample questions are initialized automatically.
+### Accounts and access
+- Student and Teacher registration and login.
+- PBKDF2-HMAC-SHA256 password hashing.
+- Teacher registration protected by an invitation code.
+- Role-based dashboards and teacher-only quiz management.
+
+### Teacher
+- Create quizzes with title, subject, description, duration, marks per question and optional start/end time.
+- Configure random question order and whether answer review is allowed.
+- Add MCQs with four options and a correct answer.
+- Remove questions from a quiz.
+- Publish or close quizzes and share a unique quiz code.
+- View attempt count, average and highest score report.
+
+### Student
+- View published quizzes and join by quiz code.
+- Take timed quizzes with previous/next navigation.
+- Save answers, clear answers and mark questions for review.
+- Automatic submission when the timer expires.
+- Automatic evaluation with correct, wrong and unanswered counts.
+- View personal result history, average/best score and leaderboard.
+
+### Technical
+- Java AWT only (no Swing).
+- SQLite database created and upgraded automatically.
+- JDBC prepared statements and foreign-key enforcement.
+- Sample subject quizzes are created automatically on first run.
 
 ## Requirements
 - JDK 17 or later
-- VS Code
-- VS Code extension: **Extension Pack for Java** (Microsoft)
-- Maven 3.8 or later
+- Maven 3.8+
+- VS Code with Extension Pack for Java (optional)
 
-## Open and run in VS Code
-1. Extract this ZIP file.
-2. In VS Code, choose **File → Open Folder** and select `OnlineQuizApplication_AWT_SQLite`.
-3. Install the **Extension Pack for Java** if VS Code prompts you.
-4. Open **Terminal → New Terminal**.
-5. Run `mvn clean compile`.
-6. Run `mvn exec:java -Dexec.mainClass="com.collegequiz.Main"`.
-7. Maven downloads the SQLite JDBC driver automatically. The app creates `online_quiz.db` in the project working directory.
+## Run
+Open the repository folder in VS Code, then run:
 
-You can also open `Main.java` and use the Java extension's Run option after Maven has resolved the project dependencies.
+```bash
+mvn clean compile
+mvn exec:java -Dexec.mainClass="com.collegequiz.Main"
+```
 
-## How registration and roles work
-1. Enter your name, email and password (minimum 6 characters).
-2. In **Register as**, select **Student** or **Teacher**.
-3. Click **Create Account**.
-4. Log in with the same email and password.
-5. Students can take quizzes. Teachers see the **Manage Questions** button and can add questions.
+The database file `online_quiz.db` is created in the project working directory.
 
-For this college demonstration build, teacher self-registration is enabled so you can demonstrate both roles easily. In a real deployment, teacher accounts should be approved by an administrator or protected by an institution-issued invitation code; otherwise a student could select Teacher.
+## Teacher invitation code
+For this college demonstration, teacher self-registration requires an invitation code. The default local demo code is:
+
+```
+QUIZ-TEACHER-2026
+```
+
+For a different code, launch with a JVM property:
+
+```bash
+mvn exec:java -Dexec.mainClass="com.collegequiz.Main" -Dquiz.teacherCode="YOUR-PRIVATE-CODE"
+```
+
+Do not use the demo code in a real deployment. Change it before sharing the application.
+
+## Demo account
+On first launch, the app creates a demo teacher account if no teacher exists:
+- Email: `demo.teacher@quiz.local`
+- Password: `Teacher@123`
+
+Change or remove this account before real use. Students can register from the login screen.
 
 ## Database
-SQLite file: `online_quiz.db`
+The application initializes the original tables (`users`, `categories`, `questions`, `results`) and adds:
+- `quizzes`
+- `quiz_questions`
+- `attempts`
+- `student_answers`
 
-Tables:
-- `users`: account details and role (`STUDENT` or internal teacher role `ADMIN`)
-- `categories`: subject/category names
-- `questions`: MCQ text, four options and correct answer
-- `results`: quiz scores and attempt details
+Existing database files are retained; schema changes use `CREATE TABLE IF NOT EXISTS`.
 
-The internal value `ADMIN` is retained for teacher accounts to remain compatible with the existing database schema and teacher-management permission checks. The registration screen displays the friendly label **Teacher**.
-
-## Source files
-- `Main.java`: application entry point and database initialization
-- `DB.java`: SQLite connection, table creation and sample data
+## Project structure
+- `Main.java`: application entry point
+- `App.java`: login/registration, student dashboard, teacher console, quiz runner, results and leaderboard
+- `DB.java`: SQLite connection and original schema/sample questions
 - `PasswordUtil.java`: password hashing and verification
-- `Question.java`: question model
-- `Msg.java`: AWT message dialog helper
-- `AuthFrame.java`: login, registration and Student/Teacher selection
-- `DashboardFrame.java`: role-aware dashboard, category selection and leaderboard
-- `QuizFrame.java`: quiz, timer, scoring and result saving
-- `AdminFrame.java`: teacher question-entry screen
+- `Question.java`: legacy question model
+- `AuthFrame.java`, `DashboardFrame.java`, `AdminFrame.java`, `QuizFrame.java`: original UI classes retained for compatibility
 
-## Team division
-See `Team_Division.md` for the three-member work split.
-
-## Notes
-- The interface uses Java AWT only; no Swing widgets are used.
-- SQLite is an embedded database; no separate database server is needed.
-- This is a local desktop prototype, not a hosted multi-user web application.
+## Important project limitations
+This is a local desktop prototype. It is not a hosted web service and does not yet provide server-side proctoring, concurrent remote exam sessions, email verification, PDF export, CSV import, or a full question-bank edit screen. Teacher quiz reports are aggregate reports, not institutional-grade analytics. SQLite is intended for a small classroom demonstration.
