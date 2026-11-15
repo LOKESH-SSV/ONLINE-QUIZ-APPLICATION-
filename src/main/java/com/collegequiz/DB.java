@@ -8,12 +8,15 @@ public final class DB {
 
     public static Connection getConnection() throws SQLException {
         Connection con = DriverManager.getConnection(URL);
-        try (Statement st = con.createStatement()) { st.execute("PRAGMA foreign_keys=ON"); }
+        try (Statement st = con.createStatement()) {
+            st.execute("PRAGMA foreign_keys=ON");
+            st.execute("PRAGMA busy_timeout=5000");
+        }
         return con;
     }
 
     public static void initialize() throws SQLException {
-        try (Connection con=getConnection(); Statement st=con.createStatement()) {
+        try (Connection con = getConnection(); Statement st = con.createStatement()) {
             st.executeUpdate("""
                 CREATE TABLE IF NOT EXISTS users(
                   user_id INTEGER PRIMARY KEY AUTOINCREMENT, full_name TEXT NOT NULL,
@@ -30,7 +33,8 @@ public final class DB {
                   question_text TEXT NOT NULL, option_a TEXT NOT NULL, option_b TEXT NOT NULL,
                   option_c TEXT NOT NULL, option_d TEXT NOT NULL,
                   correct_option TEXT NOT NULL CHECK(correct_option IN ('A','B','C','D')),
-                  difficulty TEXT DEFAULT 'MEDIUM',
+                  difficulty TEXT DEFAULT 'MEDIUM', topic TEXT DEFAULT '',
+                  explanation TEXT DEFAULT '',
                   FOREIGN KEY(category_id) REFERENCES categories(category_id))""");
             st.executeUpdate("""
                 CREATE TABLE IF NOT EXISTS results(
@@ -70,12 +74,38 @@ public final class DB {
                   is_correct INTEGER NOT NULL DEFAULT 0,
                   FOREIGN KEY(attempt_id) REFERENCES attempts(attempt_id) ON DELETE CASCADE,
                   FOREIGN KEY(question_id) REFERENCES questions(question_id))""");
-            String[] cats={"Java","C++","DBMS","Computer Networks"};
-            try(PreparedStatement ps=con.prepareStatement("INSERT OR IGNORE INTO categories(category_name) VALUES(?)")){
-                for(String cat:cats){ps.setString(1,cat);ps.addBatch();} ps.executeBatch();
+
+            // Safe, additive migrations for databases created by earlier project versions.
+            ensureColumn(con, "questions", "difficulty", "TEXT DEFAULT 'MEDIUM'");
+            ensureColumn(con, "questions", "topic", "TEXT DEFAULT ''");
+            ensureColumn(con, "questions", "explanation", "TEXT DEFAULT ''");
+            ensureColumn(con, "quizzes", "negative_marking_enabled", "INTEGER NOT NULL DEFAULT 0");
+            ensureColumn(con, "quizzes", "negative_marks", "REAL NOT NULL DEFAULT 0");
+            ensureColumn(con, "quizzes", "starts_at", "TEXT");
+            ensureColumn(con, "quizzes", "ends_at", "TEXT");
+            ensureColumn(con, "attempts", "started_at", "TEXT");
+            ensureColumn(con, "attempts", "status", "TEXT NOT NULL DEFAULT 'SUBMITTED'");
+            ensureColumn(con, "attempts", "incorrect_answers", "INTEGER NOT NULL DEFAULT 0");
+            ensureColumn(con, "attempts", "unanswered_answers", "INTEGER NOT NULL DEFAULT 0");
+            ensureColumn(con, "attempts", "raw_score", "REAL NOT NULL DEFAULT 0");
+            ensureColumn(con, "attempts", "negative_marks_applied", "REAL NOT NULL DEFAULT 0");
+            ensureColumn(con, "student_answers", "marked_for_review", "INTEGER NOT NULL DEFAULT 0");
+            try (Statement update = con.createStatement()) {
+                update.executeUpdate("UPDATE attempts SET started_at=COALESCE(started_at,submitted_at) WHERE started_at IS NULL");
             }
-            // Remove only the old built-in demo MCQs. Teachers now create every quiz question.
-            String[] demoQuestions={
+            try (Statement index = con.createStatement()) {
+                index.executeUpdate("CREATE UNIQUE INDEX IF NOT EXISTS ux_student_answers_attempt_question ON student_answers(attempt_id, question_id)");
+            }
+
+            String[] cats = {"Java", "C++", "DBMS", "Computer Networks"};
+            try (PreparedStatement ps = con.prepareStatement(
+                    "INSERT OR IGNORE INTO categories(category_name) VALUES(?)")) {
+                for (String cat : cats) { ps.setString(1, cat); ps.addBatch(); }
+                ps.executeBatch();
+            }
+
+            // Remove only known legacy demo MCQs that are not part of a published quiz.
+            String[] demoQuestions = {
                 "Which keyword is used to inherit a class in Java?",
                 "Which method is the entry point of a Java application?",
                 "Which collection does not allow duplicate elements?",
@@ -85,9 +115,23 @@ public final class DB {
                 "Which SQL command retrieves rows from a table?",
                 "Which protocol is used to browse secure websites?"
             };
-            try(PreparedStatement ps=con.prepareStatement("DELETE FROM questions WHERE question_text=? AND question_id NOT IN (SELECT question_id FROM quiz_questions)")){
-                for(String q:demoQuestions){ps.setString(1,q);ps.addBatch();}ps.executeBatch();
+            try (PreparedStatement ps = con.prepareStatement(
+                    "DELETE FROM questions WHERE question_text=? AND question_id NOT IN (SELECT question_id FROM quiz_questions)")) {
+                for (String q : demoQuestions) { ps.setString(1, q); ps.addBatch(); }
+                ps.executeBatch();
             }
+        }
+    }
+
+    private static void ensureColumn(Connection con, String table, String column, String definition)
+            throws SQLException {
+        boolean exists = false;
+        try (Statement st = con.createStatement();
+             ResultSet rs = st.executeQuery("PRAGMA table_info(" + table + ")")) {
+            while (rs.next()) if (column.equalsIgnoreCase(rs.getString("name"))) exists = true;
+        }
+        if (!exists) try (Statement st = con.createStatement()) {
+            st.executeUpdate("ALTER TABLE " + table + " ADD COLUMN " + column + " " + definition);
         }
     }
 }

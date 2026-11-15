@@ -7,6 +7,20 @@ public final class Msg {
     private Msg() {}
     public static void show(Frame owner,String message){new DialogBox(owner,message,"Message");}
     public static void error(Frame owner,Exception ex){new DialogBox(owner,ex.getMessage(),"Error");}
+    public static boolean confirm(Frame owner, String message) {
+        Dialog d = new Dialog(owner, "Confirm", true);
+        d.setLayout(new BorderLayout(10, 10));
+        d.add(new Label(message), BorderLayout.CENTER);
+        final boolean[] answer = {false};
+        Panel buttons = new Panel();
+        Button yes = new Button("Yes, Submit"), no = new Button("Continue Quiz");
+        buttons.add(yes); buttons.add(no); d.add(buttons, BorderLayout.SOUTH);
+        yes.addActionListener(e -> { answer[0] = true; d.dispose(); });
+        no.addActionListener(e -> d.dispose());
+        d.addWindowListener(new WindowAdapter(){public void windowClosing(WindowEvent e){d.dispose();}});
+        d.setSize(420,140); d.setLocationRelativeTo(owner); d.setVisible(true);
+        return answer[0];
+    }
     public static String prompt(Frame owner,String message){
         Dialog d=new Dialog(owner,"Input",true);d.setLayout(new BorderLayout(8,8));
         d.add(new Label(message),BorderLayout.NORTH);TextField input=new TextField(18);d.add(input,BorderLayout.CENTER);
