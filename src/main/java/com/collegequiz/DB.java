@@ -74,25 +74,20 @@ public final class DB {
             try(PreparedStatement ps=con.prepareStatement("INSERT OR IGNORE INTO categories(category_name) VALUES(?)")){
                 for(String cat:cats){ps.setString(1,cat);ps.addBatch();} ps.executeBatch();
             }
-            addSample(con,"Java","Which keyword is used to inherit a class in Java?","implements","extends","inherits","super","B");
-            addSample(con,"Java","Which method is the entry point of a Java application?","start()","run()","main()","init()","C");
-            addSample(con,"Java","Which collection does not allow duplicate elements?","ArrayList","LinkedList","HashSet","Vector","C");
-            addSample(con,"Java","Which JDBC object is suited to parameterized SQL queries?","Statement","PreparedStatement","ResultSet","DriverManager","B");
-            addSample(con,"Java","What does JVM stand for?","Java Variable Method","Java Virtual Machine","Joint Virtual Memory","Java Verified Module","B");
-            addSample(con,"C++","Which symbol ends a C++ statement?",":",";",".",",","B");
-            addSample(con,"DBMS","Which SQL command retrieves rows from a table?","GET","OPEN","SELECT","FETCHALL","C");
-            addSample(con,"Computer Networks","Which protocol is used to browse secure websites?","FTP","HTTPS","SMTP","Telnet","B");
-        }
-    }
-
-    private static void addSample(Connection con,String cat,String q,String a,String b,String c,String d,String answer)throws SQLException{
-        try(PreparedStatement check=con.prepareStatement("SELECT COUNT(*) FROM questions WHERE question_text=?");
-            PreparedStatement insert=con.prepareStatement("""
-              INSERT INTO questions(category_id,question_text,option_a,option_b,option_c,option_d,correct_option)
-              SELECT category_id,?,?,?,?,?,? FROM categories WHERE category_name=?""")){
-            check.setString(1,q);try(ResultSet rs=check.executeQuery()){if(rs.next()&&rs.getInt(1)>0)return;}
-            insert.setString(1,q);insert.setString(2,a);insert.setString(3,b);insert.setString(4,c);
-            insert.setString(5,d);insert.setString(6,answer);insert.setString(7,cat);insert.executeUpdate();
+            // Remove only the old built-in demo MCQs. Teachers now create every quiz question.
+            String[] demoQuestions={
+                "Which keyword is used to inherit a class in Java?",
+                "Which method is the entry point of a Java application?",
+                "Which collection does not allow duplicate elements?",
+                "Which JDBC object is suited to parameterized SQL queries?",
+                "What does JVM stand for?",
+                "Which symbol ends a C++ statement?",
+                "Which SQL command retrieves rows from a table?",
+                "Which protocol is used to browse secure websites?"
+            };
+            try(PreparedStatement ps=con.prepareStatement("DELETE FROM questions WHERE question_text=? AND question_id NOT IN (SELECT question_id FROM quiz_questions)")){
+                for(String q:demoQuestions){ps.setString(1,q);ps.addBatch();}ps.executeBatch();
+            }
         }
     }
 }
