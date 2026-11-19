@@ -14,7 +14,6 @@ import java.util.List;
  */
 public final class App {
     private App() {}
-    private static final String TEACHER_CODE = System.getProperty("quiz.teacherCode", "QUIZ-TEACHER-2026");
     private static final DateTimeFormatter SQL_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     public static void launch() {
@@ -188,22 +187,19 @@ public final class App {
     }
 
     private static class CreateAccountWindow extends Frame {
-        final TextField name=new TextField(25), email=new TextField(25), password=new TextField(25), confirm=new TextField(25), teacherCode=new TextField(25);
+        final TextField name=new TextField(25), email=new TextField(25), password=new TextField(25), confirm=new TextField(25);
         final Choice role=new Choice();
         CreateAccountWindow() {
             super("Online Quiz Application - Create Account");
             style(this); setLayout(new GridBagLayout()); setSize(540,570); setLocationRelativeTo(null);
-            password.setEchoChar('*'); confirm.setEchoChar('*'); teacherCode.setEchoChar('*'); role.add("Student"); role.add("Teacher");
+            password.setEchoChar('*'); confirm.setEchoChar('*'); role.add("Student"); role.add("Teacher");
             GridBagConstraints g=new GridBagConstraints(); g.insets=new Insets(7,12,7,12); g.fill=GridBagConstraints.HORIZONTAL;
             Label title=new Label("CREATE YOUR ACCOUNT",Label.CENTER); title.setFont(new Font("Arial",Font.BOLD,23)); title.setForeground(new Color(35,65,125));
             g.gridx=0; g.gridy=0; g.gridwidth=2; add(title,g); g.gridwidth=1;
             row(g,1,"Full name",name); row(g,2,"Email address",email); row(g,3,"Password (minimum 8 characters)",password);
-            row(g,4,"Confirm password",confirm); row(g,5,"Create account as",role); row(g,6,"Teacher invitation code",teacherCode);
-            teacherCode.setEnabled(false);
-            role.addItemListener(e -> { boolean t="Teacher".equals(role.getSelectedItem()); teacherCode.setEnabled(t); if(!t) teacherCode.setText(""); });
-            Label note=new Label("Teacher accounts require an invitation code.",Label.CENTER); g.gridx=0; g.gridy=7; g.gridwidth=2; add(note,g);
+            row(g,4,"Confirm password",confirm); row(g,5,"Create account as",role);
             Button create=new Button("Create Account"), back=new Button("Back to Login"); Panel actions=new Panel(new FlowLayout()); actions.add(create); actions.add(back);
-            g.gridy=8; add(actions,g); create.addActionListener(e -> register()); back.addActionListener(e -> { new LoginWindow(); dispose(); });
+            g.gridy=6; add(actions,g); create.addActionListener(e -> register()); back.addActionListener(e -> { new LoginWindow(); dispose(); });
             closeOnX(this); setVisible(true);
         }
         void row(GridBagConstraints g,int y,String label,Component field) { g.gridx=0; g.gridy=y; add(new Label(label),g); g.gridx=1; add(field,g); }
@@ -212,7 +208,6 @@ public final class App {
             if(n.isEmpty() || !mail.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$")) { info(this,"Enter a valid full name and email address."); return; }
             if(pw.length()<8 || !pw.equals(confirm.getText())) { info(this,"Password must contain at least 8 characters and both password fields must match."); return; }
             boolean teacher="Teacher".equals(role.getSelectedItem());
-            if(teacher && !TEACHER_CODE.equals(teacherCode.getText().trim())) { info(this,"Invalid teacher invitation code. Ask your project administrator for the code."); return; }
             try(Connection c=db(); PreparedStatement p=c.prepareStatement("INSERT INTO users(full_name,email,password_hash,role) VALUES(?,?,?,?)")) {
                 p.setString(1,n); p.setString(2,mail); p.setString(3,PasswordUtil.hash(pw)); p.setString(4,teacher?"ADMIN":"STUDENT"); p.executeUpdate();
                 info(this,"Account created successfully. Please log in."); new LoginWindow(); dispose();
