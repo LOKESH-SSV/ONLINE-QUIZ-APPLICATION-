@@ -81,6 +81,15 @@ public final class App {
             ensureColumn(c, "quizzes", "randomize", "INTEGER NOT NULL DEFAULT 1");
             ensureColumn(c, "quizzes", "allow_review", "INTEGER NOT NULL DEFAULT 1");
             ensureColumn(c, "quiz_questions", "position", "INTEGER NOT NULL DEFAULT 0");
+
+            // Add columns used by the current quiz workflow when an older attempts table already exists.
+            ensureColumn(c, "attempts", "score", "REAL NOT NULL DEFAULT 0");
+            ensureColumn(c, "attempts", "total_marks", "REAL NOT NULL DEFAULT 0");
+            ensureColumn(c, "attempts", "correct_count", "INTEGER NOT NULL DEFAULT 0");
+            ensureColumn(c, "attempts", "wrong_count", "INTEGER NOT NULL DEFAULT 0");
+            ensureColumn(c, "attempts", "unanswered_count", "INTEGER NOT NULL DEFAULT 0");
+            ensureColumn(c, "attempts", "submitted_at", "TEXT");
+
             s.executeUpdate("CREATE UNIQUE INDEX IF NOT EXISTS ux_quizzes_quiz_code ON quizzes(quiz_code) WHERE quiz_code IS NOT NULL");
             s.executeUpdate("CREATE INDEX IF NOT EXISTS idx_quizzes_status ON quizzes(status)");
             s.executeUpdate("CREATE INDEX IF NOT EXISTS idx_attempts_user ON attempts(user_id)");
