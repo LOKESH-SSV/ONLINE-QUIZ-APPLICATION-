@@ -24,7 +24,7 @@ public final class App {
             EventQueue.invokeLater(AuthWindow::new);
         } catch (Exception ex) {
             ex.printStackTrace();
-            new ErrorDialog(null, "Database initialization failed: " + ex.getMessage());
+            new InfoDialog(null, "Database initialization failed: " + ex.getMessage(), "Error");
         }
     }
 
