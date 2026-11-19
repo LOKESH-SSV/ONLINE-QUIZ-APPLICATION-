@@ -189,7 +189,8 @@ public final class App {
                 p.setString(1,email.getText().trim());
                 try(ResultSet r=p.executeQuery()) {
                     if(!r.next() || !PasswordUtil.verify(password.getText(),r.getString("password_hash"))) { info(this,"Invalid email or password."); return; }
-                    new Dashboard(r.getInt("user_id"),r.getString("full_name"),r.getString("role")); dispose();
+                    String role = r.getString("role");
+                    new Dashboard(r.getInt("user_id"),r.getString("full_name"),role); dispose();
                 }
             } catch(Exception ex) { error(this,ex); }
         }
@@ -231,17 +232,49 @@ public final class App {
         public String toString(){return title+" ["+subject+"] - "+status+" - "+count+" Qs";}
     }
 
+    private static boolean isTeacherRole(String role) {
+        return "ADMIN".equalsIgnoreCase(role) || "TEACHER".equalsIgnoreCase(role);
+    }
+
     private static class Dashboard extends Frame {
         final int uid;final String name,role;final java.awt.List quizList=new java.awt.List(10);final java.util.List<QuizRow> rows=new ArrayList<>();
         Label stats=new Label("Loading your activity...");
-        Dashboard(int id,String n,String r){super("Quiz Dashboard");uid=id;name=n;role=r;style(this);setSize(800,570);setLocationRelativeTo(null);setLayout(new BorderLayout(10,10));
-            Panel top=new Panel(new GridLayout(2,1));Label welcome=new Label("Welcome, "+name+" ("+("ADMIN".equals(role)?"Teacher":"Student")+")",Label.CENTER);welcome.setFont(new Font("Arial",Font.BOLD,21));top.add(welcome);top.add(stats);add(top,BorderLayout.NORTH);
-            Panel center=new Panel(new BorderLayout(8,8));center.add(new Label("Available / upcoming quizzes (select one):"),BorderLayout.NORTH);center.add(quizList,BorderLayout.CENTER);add(center,BorderLayout.CENTER);
-            Panel buttons=new Panel(new FlowLayout());Button take=new Button("Take selected quiz"),join=new Button("Join by quiz code"),history=new Button("My results"),leader=new Button("Leaderboard"),refresh=new Button("Refresh"),logout=new Button("Logout");
-            buttons.add(take);buttons.add(join);buttons.add(history);buttons.add(leader);buttons.add(refresh);if("ADMIN".equals(role))buttons.add(new Button("Teacher Console"));buttons.add(logout);add(buttons,BorderLayout.SOUTH);
-            take.addActionListener(e->takeSelected());join.addActionListener(e->joinByCode());history.addActionListener(e->showHistory());leader.addActionListener(e->showLeaderboard());refresh.addActionListener(e->load());
-            if("ADMIN".equals(role)){for(Component x:buttons.getComponents())if(x instanceof Button b&&b.getLabel().equals("Teacher Console"))b.addActionListener(e->new TeacherConsole(this,uid));}
-            logout.addActionListener(e->{new LoginWindow();dispose();});quizList.addActionListener(e->takeSelected());closeOnX(this);load();setVisible(true);
+        Dashboard(int id,String n,String r){
+            super(isTeacherRole(r) ? "Teacher Dashboard" : "Student Dashboard");
+            uid=id;name=n;role=r;style(this);setSize(800,570);setLocationRelativeTo(null);setLayout(new BorderLayout(10,10));
+            boolean teacher=isTeacherRole(role);
+            Panel top=new Panel(new GridLayout(2,1));
+            Label welcome=new Label("Welcome, "+name+(teacher?" (Teacher)":" (Student)"),Label.CENTER);
+            welcome.setFont(new Font("Arial",Font.BOLD,21));top.add(welcome);
+            if(teacher){
+                top.add(new Label("Create quizzes, add questions, publish quizzes and view reports.",Label.CENTER));
+                add(top,BorderLayout.NORTH);
+                Panel center=new Panel(new GridBagLayout());
+                Label message=new Label("Teacher workspace");
+                message.setFont(new Font("Arial",Font.BOLD,20));
+                center.add(message);add(center,BorderLayout.CENTER);
+                Panel buttons=new Panel(new FlowLayout());
+                Button manage=new Button("Manage My Quizzes"),logout=new Button("Logout");
+                buttons.add(manage);buttons.add(logout);add(buttons,BorderLayout.SOUTH);
+                manage.addActionListener(e->new TeacherConsole(this,uid));
+                logout.addActionListener(e->{new LoginWindow();dispose();});
+                closeOnX(this);setVisible(true);
+                return;
+            }
+            top.add(stats);add(top,BorderLayout.NORTH);
+            Panel center=new Panel(new BorderLayout(8,8));
+            center.add(new Label("Available / upcoming quizzes (select one):"),BorderLayout.NORTH);
+            center.add(quizList,BorderLayout.CENTER);add(center,BorderLayout.CENTER);
+            Panel buttons=new Panel(new FlowLayout());
+            Button take=new Button("Take selected quiz"),join=new Button("Join by quiz code"),
+                   history=new Button("My results"),leader=new Button("Leaderboard"),
+                   refresh=new Button("Refresh"),logout=new Button("Logout");
+            buttons.add(take);buttons.add(join);buttons.add(history);buttons.add(leader);buttons.add(refresh);buttons.add(logout);
+            add(buttons,BorderLayout.SOUTH);
+            take.addActionListener(e->takeSelected());join.addActionListener(e->joinByCode());
+            history.addActionListener(e->showHistory());leader.addActionListener(e->showLeaderboard());
+            refresh.addActionListener(e->load());logout.addActionListener(e->{new LoginWindow();dispose();});
+            quizList.addActionListener(e->takeSelected());closeOnX(this);load();setVisible(true);
         }
         void load(){quizList.removeAll();rows.clear();String sql="SELECT q.quiz_id,q.title,q.subject,q.duration_minutes,q.quiz_code,q.status,COALESCE(q.start_at,''),COALESCE(q.end_at,''),COUNT(qq.question_id) FROM quizzes q LEFT JOIN quiz_questions qq ON qq.quiz_id=q.quiz_id WHERE q.status='PUBLISHED' GROUP BY q.quiz_id ORDER BY q.created_at DESC";
             try(Connection c=db();Statement s=c.createStatement();ResultSet r=s.executeQuery(sql)){while(r.next()){QuizRow x=new QuizRow();x.id=r.getInt(1);x.title=r.getString(2);x.subject=r.getString(3);x.minutes=r.getInt(4);x.code=r.getString(5);x.status=r.getString(6);x.start=r.getString(7);x.end=r.getString(8);x.count=r.getInt(9);rows.add(x);quizList.add(x.toString()+" | Code: "+x.code);}}
