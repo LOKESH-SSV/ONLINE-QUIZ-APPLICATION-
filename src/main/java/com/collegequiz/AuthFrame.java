@@ -9,9 +9,6 @@ public class AuthFrame extends Frame {
     private final TextField email = new TextField(22);
     private final TextField password = new TextField(22);
     private final Choice accountType = new Choice();
-    private final TextField teacherCode = new TextField(22);
-    private static final String TEACHER_CODE =
-            System.getProperty("quiz.teacherCode", "QUIZ-TEACHER-2026");
 
     public AuthFrame() {
         super("Online Quiz Application - Login / Register");
@@ -38,21 +35,17 @@ public class AuthFrame extends Frame {
         row(c, 2, "Email", email);
         row(c, 3, "Password", password);
         row(c, 4, "Register as", accountType);
-        row(c, 5, "Teacher invitation code", teacherCode);
-        teacherCode.setEnabled(false);
-        accountType.addItemListener(e ->
-                teacherCode.setEnabled("Teacher".equals(accountType.getSelectedItem())));
 
         Button login = new Button("Login");
         Button register = new Button("Create Account");
         Panel buttons = new Panel();
         buttons.add(login);
         buttons.add(register);
-        c.gridx = 0; c.gridy = 6; c.gridwidth = 2;
+        c.gridx = 0; c.gridy = 5; c.gridwidth = 2;
         add(buttons, c);
 
         Label note = new Label("Choose Student or Teacher when creating an account.", Label.CENTER);
-        c.gridy = 7;
+        c.gridy = 6;
         add(note, c);
 
         login.addActionListener(e -> login());
@@ -101,10 +94,6 @@ public class AuthFrame extends Frame {
 
         // ADMIN is the internal database role used by the teacher question-management panel.
         boolean isTeacher = accountType.getSelectedItem().equals("Teacher");
-        if (isTeacher && !TEACHER_CODE.equals(teacherCode.getText().trim())) {
-            Msg.show(this, "A valid teacher invitation code is required.");
-            return;
-        }
         String role = isTeacher ? "ADMIN" : "STUDENT";
         String sql = "INSERT INTO users(full_name,email,password_hash,role) VALUES(?,?,?,?)";
         try (Connection con = DB.getConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
@@ -117,7 +106,6 @@ public class AuthFrame extends Frame {
             name.setText("");
             email.setText("");
             password.setText("");
-            teacherCode.setText("");
             accountType.select("Student");
         } catch (SQLException ex) {
             Msg.error(this, ex);
