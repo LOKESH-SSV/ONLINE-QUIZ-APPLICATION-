@@ -72,11 +72,39 @@ public final class App {
                   FOREIGN KEY(attempt_id) REFERENCES attempts(attempt_id) ON DELETE CASCADE,
                   FOREIGN KEY(question_id) REFERENCES questions(question_id)
                 )""");
+            // Migrate databases created by DB.initialize() or older project versions.
+            ensureColumn(c, "quizzes", "subject", "TEXT NOT NULL DEFAULT ''");
+            ensureColumn(c, "quizzes", "description", "TEXT DEFAULT ''");
+            ensureColumn(c, "quizzes", "marks_per_question", "REAL NOT NULL DEFAULT 1");
+            ensureColumn(c, "quizzes", "quiz_code", "TEXT");
+            ensureColumn(c, "quizzes", "start_at", "TEXT");
+            ensureColumn(c, "quizzes", "end_at", "TEXT");
+            ensureColumn(c, "quizzes", "randomize", "INTEGER NOT NULL DEFAULT 1");
+            ensureColumn(c, "quizzes", "allow_review", "INTEGER NOT NULL DEFAULT 1");
+            ensureColumn(c, "quiz_questions", "position", "INTEGER NOT NULL DEFAULT 0");
+            s.executeUpdate("CREATE UNIQUE INDEX IF NOT EXISTS ux_quizzes_quiz_code ON quizzes(quiz_code) WHERE quiz_code IS NOT NULL");
             s.executeUpdate("CREATE INDEX IF NOT EXISTS idx_quizzes_status ON quizzes(status)");
             s.executeUpdate("CREATE INDEX IF NOT EXISTS idx_attempts_user ON attempts(user_id)");
             s.executeUpdate("CREATE INDEX IF NOT EXISTS idx_answers_attempt ON student_answers(attempt_id)");
         }
-        seedDemoQuizzes();
+    }
+
+    private static void ensureColumn(Connection c, String table, String column, String definition) throws SQLException {
+        boolean exists = false;
+        try (Statement st = c.createStatement();
+             ResultSet rs = st.executeQuery("PRAGMA table_info(" + table + ")")) {
+            while (rs.next()) {
+                if (column.equalsIgnoreCase(rs.getString("name"))) {
+                    exists = true;
+                    break;
+                }
+            }
+        }
+        if (!exists) {
+            try (Statement st = c.createStatement()) {
+                st.executeUpdate("ALTER TABLE " + table + " ADD COLUMN " + column + " " + definition);
+            }
+        }
     }
 
     private static void seedDemoQuizzes() throws SQLException {
