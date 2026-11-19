@@ -45,44 +45,104 @@ public class AvailableQuizzesFrame extends Frame {
     }
 
     private void joinQuiz() {
-        String code=accessCode.getText().trim().toUpperCase();
-        if(code.isEmpty()){Msg.show(this,"Enter the quiz access code.");return;}
-        String sql="""
-            SELECT q.quiz_id,q.title,c.category_name,q.duration_minutes,q.negative_marking_enabled,
-            q.negative_marks,q.starts_at,q.ends_at
-            FROM quizzes q JOIN categories c ON c.category_id=q.category_id
-            WHERE q.access_code=? AND q.status='PUBLISHED'""";
-        try(Connection c=DB.getConnection();PreparedStatement p=c.prepareStatement(sql)){
-            p.setString(1,code);
-            try(ResultSet r=p.executeQuery()){
-                if(!r.next()){Msg.show(this,"No published quiz found for that code.");return;}
-                int quizId=r.getInt(1),minutes=r.getInt(4);
-                String cat=r.getString(3),start=r.getString(7),end=r.getString(8);
-                LocalDateTime now=LocalDateTime.now();
-                DateTimeFormatter fmt=DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-                if(start!=null&&!start.isBlank()&&now.isBefore(LocalDateTime.parse(start,fmt))){
-                    Msg.show(this,"This quiz is scheduled to start at "+start+".");return;
+        String code = accessCode.getText().trim().toUpperCase();
+
+        if (code.isEmpty()) {
+            Msg.show(this, "Enter the quiz access code.");
+            return;
+        }
+
+        int quizId = -1;
+        int minutes = 10;
+        String cat = "";
+        boolean neg = false;
+        double penalty = 0;
+        List<Question> qs = new ArrayList<>();
+
+        String sql = """
+            SELECT q.quiz_id, q.title, c.category_name,
+            q.duration_minutes, q.negative_marking_enabled,
+            q.negative_marks, q.starts_at, q.ends_at
+            FROM quizzes q
+            JOIN categories c ON c.category_id = q.category_id
+            WHERE q.access_code = ? AND q.status = 'PUBLISHED'
+            """;
+
+        try (Connection c = DB.getConnection();
+             PreparedStatement p = c.prepareStatement(sql)) {
+
+            p.setString(1, code);
+
+            try (ResultSet r = p.executeQuery()) {
+                if (!r.next()) {
+                    Msg.show(this, "No published quiz found for that code.");
+                    return;
                 }
-                if(end!=null&&!end.isBlank()&&now.isAfter(LocalDateTime.parse(end,fmt))){
-                    Msg.show(this,"The scheduled time for this quiz has ended.");return;
+
+                quizId = r.getInt(1);
+                cat = r.getString(3);
+                minutes = r.getInt(4);
+                neg = r.getInt(5) == 1;
+                penalty = r.getDouble(6);
+
+                String start = r.getString(7);
+                String end = r.getString(8);
+
+                LocalDateTime now = LocalDateTime.now();
+                DateTimeFormatter fmt =
+                    DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+                if (start != null && !start.isBlank()
+                        && now.isBefore(LocalDateTime.parse(start, fmt))) {
+                    Msg.show(this, "This quiz is scheduled to start at " + start);
+                    return;
                 }
-                boolean neg=r.getInt(5)==1;double penalty=r.getDouble(6);
-                List<Question> qs=new ArrayList<>();
-                try(PreparedStatement q=c.prepareStatement("""
-                    SELECT x.question_id,x.question_text,x.option_a,x.option_b,x.option_c,x.option_d,
-                    x.correct_option,x.difficulty,x.topic,x.explanation
-                    FROM quiz_questions z JOIN questions x ON x.question_id=z.question_id
-                    WHERE z.quiz_id=? ORDER BY z.question_id""")){
-                    q.setInt(1,quizId);
-                    try(ResultSet a=q.executeQuery()){
-                        while(a.next())qs.add(new Question(a.getInt(1),a.getString(2),a.getString(3),
-                                a.getString(4),a.getString(5),a.getString(6),a.getString(7),
-                                a.getString(8),a.getString(9),a.getString(10)));
+
+                if (end != null && !end.isBlank()
+                        && now.isAfter(LocalDateTime.parse(end, fmt))) {
+                    Msg.show(this, "The scheduled time for this quiz has ended.");
+                    return;
+                }
+            }
+
+            try (PreparedStatement q = c.prepareStatement("""
+                SELECT x.question_id, x.question_text,
+                x.option_a, x.option_b, x.option_c, x.option_d,
+                x.correct_option, x.difficulty, x.topic, x.explanation
+                FROM quiz_questions z
+                JOIN questions x ON x.question_id = z.question_id
+                WHERE z.quiz_id = ?
+                ORDER BY z.question_id
+                """)) {
+
+                q.setInt(1, quizId);
+
+                try (ResultSet a = q.executeQuery()) {
+                    while (a.next()) {
+                        qs.add(new Question(
+                            a.getInt(1), a.getString(2),
+                            a.getString(3), a.getString(4),
+                            a.getString(5), a.getString(6),
+                            a.getString(7), a.getString(8),
+                            a.getString(9), a.getString(10)
+                        ));
                     }
                 }
-                if(qs.isEmpty()){Msg.show(this,"This quiz has no questions.");return;}
-                new QuizFrame(userId,name,role,cat,qs,minutes,quizId,neg,penalty);dispose();
             }
-        }catch(SQLException e){Msg.error(this,e);}
+
+        } catch (SQLException e) {
+            Msg.error(this, e);
+            return;
+        }
+
+        if (qs.isEmpty()) {
+            Msg.show(this, "This quiz has no questions.");
+            return;
+        }
+
+        // Open the quiz only after all database resources have been closed.
+        new QuizFrame(userId, name, role, cat,
+                      qs, minutes, quizId, neg, penalty);
+        dispose();
     }
 }
